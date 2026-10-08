@@ -115,18 +115,121 @@ You can add more tests in `tests/test_recommender.py`.
 
 ## Sample Recommendation Output
 
-Paste a sample of your recommender's output here as a text block so a reader can see what it produces:
+Output of `python src/main.py` for the three built-in profiles (`my_taste`, `high_energy`, `low_energy`). Each song shows its final score out of 4.00 and the reasons that produced it.
 
 ```
-# e.g.:
-# User profile: genre=indie, mood=chill, energy=low
-# Recommendations:
-#   1. ...
-#   2. ...
-#   3. ...
-```
+================================================================
+ Top 5 recommendations for: my_taste
+================================================================
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
+1. Love Yourz  by J. Cole
+   Score: 3.98 / 4.00
+   Why:
+     - genre match: rap (+2.0)
+     - mood match: reflective (+1.0)
+     - energy 0.48 vs target 0.50 (+0.98)
+
+2. Heart on Ice  by Rod Wave
+   Score: 3.88 / 4.00
+   Why:
+     - genre match: hip-hop (+2.0)
+     - mood match: melancholic (+1.0)
+     - energy 0.38 vs target 0.50 (+0.88)
+
+3. First Day Out  by Tee Grizzley
+   Score: 2.56 / 4.00
+   Why:
+     - genre match: trap (+2.0)
+     - energy 0.94 vs target 0.50 (+0.56)
+
+4. Let Me Love You  by Mario
+   Score: 0.96 / 4.00
+   Why:
+     - energy 0.54 vs target 0.50 (+0.96)
+
+5. Midnight Coding  by LoRoom
+   Score: 0.92 / 4.00
+   Why:
+     - energy 0.42 vs target 0.50 (+0.92)
+
+----------------------------------------------------------------
+
+================================================================
+ Top 5 recommendations for: high_energy
+================================================================
+
+1. Levels  by Avicii
+   Score: 4.00 / 4.00
+   Why:
+     - genre match: EDM (+2.0)
+     - mood match: uplifting (+1.0)
+     - energy 0.95 vs target 0.95 (+1.00)
+
+2. First Day Out  by Tee Grizzley
+   Score: 3.99 / 4.00
+   Why:
+     - genre match: trap (+2.0)
+     - mood match: aggressive (+1.0)
+     - energy 0.94 vs target 0.95 (+0.99)
+
+3. Enter Sandman  by Metallica
+   Score: 2.98 / 4.00
+   Why:
+     - genre match: metal (+2.0)
+     - energy 0.97 vs target 0.95 (+0.98)
+
+4. Gym Hero  by Max Pulse
+   Score: 0.98 / 4.00
+   Why:
+     - energy 0.93 vs target 0.95 (+0.98)
+
+5. Storm Runner  by Voltline
+   Score: 0.96 / 4.00
+   Why:
+     - energy 0.91 vs target 0.95 (+0.96)
+
+----------------------------------------------------------------
+
+================================================================
+ Top 5 recommendations for: low_energy
+================================================================
+
+1. Clair de Lune  by Claude Debussy
+   Score: 3.94 / 4.00
+   Why:
+     - genre match: classical (+2.0)
+     - mood match: dreamy (+1.0)
+     - energy 0.14 vs target 0.20 (+0.94)
+
+2. Spacewalk Thoughts  by Orbit Bloom
+   Score: 3.92 / 4.00
+   Why:
+     - genre match: ambient (+2.0)
+     - mood match: chill (+1.0)
+     - energy 0.28 vs target 0.20 (+0.92)
+
+3. Library Rain  by Paper Lanterns
+   Score: 3.85 / 4.00
+   Why:
+     - genre match: lofi (+2.0)
+     - mood match: chill (+1.0)
+     - energy 0.35 vs target 0.20 (+0.85)
+
+4. Midnight Coding  by LoRoom
+   Score: 3.78 / 4.00
+   Why:
+     - genre match: lofi (+2.0)
+     - mood match: chill (+1.0)
+     - energy 0.42 vs target 0.20 (+0.78)
+
+5. Focus Flow  by LoRoom
+   Score: 2.80 / 4.00
+   Why:
+     - genre match: lofi (+2.0)
+     - energy 0.40 vs target 0.20 (+0.80)
+
+----------------------------------------------------------------
+```
 
 ---
 
