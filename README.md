@@ -17,17 +17,35 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+Real-world recommenders such as Spotify's combine two broad approaches: collaborative filtering, which learns from what millions of other listeners play, skip and save, and content-based filtering, which compares the measurable characteristics of songs (genre, tempo, energy, mood) to what a listener already likes. My version is purely content-based. It has no listening history and no other users, so it can only compare a song's attributes to a single stated taste profile. It prioritizes **closeness of match** over popularity or novelty. Each song gets a score for how well it fits the user, and the highest-scoring songs are recommended. Genre carries the most weight, mood is close behind, and energy is rewarded for being *near* the user's target, not for being high.
 
-Some prompts to answer:
+### Features used
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+**`Song`** (each row of `data/songs.csv`):
 
-You can include a simple diagram or bullet list if helpful.
+- `genre`, `mood`: categorical, used in scoring
+- `energy` (0-1): numeric, used in scoring
+- `tempo_bpm`, `valence`, `danceability`, `acousticness`: stored for each song and available for later experiments
+- `id`, `title`, `artist`: identifiers, used for display only, not scoring
+
+**`UserProfile`**:
+
+- `favorite_genre`: the genre the user wants
+- `favorite_mood`: the mood the user wants
+- `target_energy` (0-1): the energy level the user wants
+- `likes_acoustic`: whether the user prefers acoustic songs, a possible extra signal using `acousticness`
+
+### Scoring and ranking
+
+Each song is scored on its own (the **scoring rule**), then all songs are sorted and the top `k` are returned (the **ranking rule**):
+
+```
+score = 0.40 * genre_match + 0.35 * mood_match + 0.25 * energy_closeness
+
+genre_match      = 1 if song genre == favorite_genre, else 0
+mood_match       = 1 if song mood  == favorite_mood,  else 0
+energy_closeness = 1 - |song energy - target_energy|
+```
 
 ---
 
