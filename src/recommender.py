@@ -1,9 +1,25 @@
 import csv
 from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
-GENRE_POINTS = 2.0
-MOOD_POINTS = 1.0
+# Ranking strategies: how many points each signal is worth.
+# Every strategy's weights must sum to MAX_SCORE (4.0) in main.py.
+# "balanced" is the default: no single signal outweighs the others.
+# The rest are experiments. "classic" is the original formula (genre 2, mood 1,
+# energy 1, and valence/acousticness ignored).
+STRATEGIES: Dict[str, Dict[str, float]] = {
+    "balanced":       {"genre": 1.0, "mood": 1.0, "energy": 1.0, "valence": 0.5,  "acousticness": 0.5},
+    "classic":        {"genre": 2.0, "mood": 1.0, "energy": 1.0, "valence": 0.0,  "acousticness": 0.0},
+    "genre_first":    {"genre": 2.5, "mood": 0.5, "energy": 0.5, "valence": 0.25, "acousticness": 0.25},
+    "mood_first":     {"genre": 0.5, "mood": 2.0, "energy": 0.5, "valence": 0.75, "acousticness": 0.25},
+    "energy_focused": {"genre": 0.5, "mood": 0.5, "energy": 2.0, "valence": 0.5,  "acousticness": 0.5},
+}
+DEFAULT_STRATEGY = "balanced"
+MAX_SCORE = 4.0
+CLOSENESS_FEATURES = ("energy", "valence", "acousticness")
+
+for _name, _weights in STRATEGIES.items():
+    assert abs(sum(_weights.values()) - MAX_SCORE) < 1e-9, f"{_name} weights must sum to 4.0"
 
 @dataclass
 class Song:
@@ -37,17 +53,35 @@ class Recommender:
     """
     OOP implementation of the recommendation logic.
     Required by tests/test_recommender.py
+
+    Uses the same scoring rules as score_song, so both interfaces agree.
     """
-    def __init__(self, songs: List[Song]):
+    def __init__(self, songs: List[Song], strategy: str = DEFAULT_STRATEGY):
         self.songs = songs
+        self.strategy = strategy
+
+    @staticmethod
+    def _to_prefs(user: UserProfile) -> Dict:
+        """Convert a UserProfile into the dict that score_song expects."""
+        return {
+            "favorite_genre": user.favorite_genre,
+            "favorite_mood": user.favorite_mood,
+            "target_energy": user.target_energy,
+            # Only used by strategies that score acousticness.
+            "target_acousticness": 0.8 if user.likes_acoustic else 0.2,
+        }
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
-        # TODO: Implement recommendation logic
-        return self.songs[:k]
+        """Return the top k songs for this user, best match first."""
+        song_dicts = [asdict(song) for song in self.songs]
+        by_dict_id = {id(d): song for d, song in zip(song_dicts, self.songs)}
+        ranked = recommend_songs(self._to_prefs(user), song_dicts, k, self.strategy)
+        return [by_dict_id[id(song_dict)] for song_dict, _, _ in ranked]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
-        # TODO: Implement explanation logic
-        return "Explanation placeholder"
+        """Explain a song's score in one line, e.g. "Title: 3.98 / 4.00 - genre match: pop (+2.0); ..."."""
+        score, reasons = score_song(self._to_prefs(user), asdict(song), self.strategy)
+        return f"{song.title}: {score:.2f} / 4.00 - " + "; ".join(reasons)
 
 def load_songs(csv_path: str) -> List[Dict]:
     """Read songs from a CSV file into dicts, converting numeric columns to int/float."""
@@ -64,37 +98,58 @@ def load_songs(csv_path: str) -> List[Dict]:
             songs.append(row)
     return songs
 
-def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
-    """Score one song (max 4.0) and return the score with human-readable reasons."""
+def _points(value: float) -> str:
+    """Format a point value with one decimal, or two when needed (2.0, 0.25)."""
+    text = f"{value:.2f}"
+    return text[:-1] if text.endswith("0") else text
+
+def score_song(
+    user_prefs: Dict, song: Dict, strategy: str = DEFAULT_STRATEGY
+) -> Tuple[float, List[str]]:
+    """Score one song (max 4.0) under a ranking strategy and return the score with reasons."""
+    weights = STRATEGIES[strategy]
     genres = user_prefs.get("favorite_genres") or {user_prefs["favorite_genre"]}
     moods = user_prefs.get("favorite_moods") or {user_prefs["favorite_mood"]}
+
+    # Closeness signals are skipped when the weight is 0 or the profile has no target.
+    features = [
+        f for f in CLOSENESS_FEATURES
+        if weights[f] and user_prefs.get(f"target_{f}") is not None
+    ]
+    # Rescale so the weights of the signals actually used still add up to MAX_SCORE.
+    # With a full profile the scale is exactly 1.0, so nothing changes.
+    scale = MAX_SCORE / (weights["genre"] + weights["mood"] + sum(weights[f] for f in features))
 
     score = 0.0
     reasons: List[str] = []
 
-    if song["genre"] in genres:
-        score += GENRE_POINTS
-        reasons.append(f"genre match: {song['genre']} (+{GENRE_POINTS:.1f})")
+    if weights["genre"] and song["genre"] in genres:
+        points = weights["genre"] * scale
+        score += points
+        reasons.append(f"genre match: {song['genre']} (+{_points(points)})")
 
-    if song["mood"] in moods:
-        score += MOOD_POINTS
-        reasons.append(f"mood match: {song['mood']} (+{MOOD_POINTS:.1f})")
+    if weights["mood"] and song["mood"] in moods:
+        points = weights["mood"] * scale
+        score += points
+        reasons.append(f"mood match: {song['mood']} (+{_points(points)})")
 
-    energy_points = 1.0 - abs(song["energy"] - user_prefs["target_energy"])
-    score += energy_points
-    reasons.append(
-        f"energy {song['energy']:.2f} vs target "
-        f"{user_prefs['target_energy']:.2f} (+{energy_points:.2f})"
-    )
+    # Full points at the exact target, fading to 0 as the gap grows.
+    for feature in features:
+        target = user_prefs[f"target_{feature}"]
+        points = weights[feature] * scale * (1.0 - abs(song[feature] - target))
+        score += points
+        reasons.append(f"{feature} {song[feature]:.2f} vs target {target:.2f} (+{points:.2f})")
 
     return score, reasons
 
-def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
+def recommend_songs(
+    user_prefs: Dict, songs: List[Dict], k: int = 5, strategy: str = DEFAULT_STRATEGY
+) -> List[Tuple[Dict, float, str]]:
     """Return the top k (song, score, explanation) tuples, highest score first."""
     scored = [
         (song, score, "; ".join(reasons))
         for song in songs
-        for score, reasons in [score_song(user_prefs, song)]
+        for score, reasons in [score_song(user_prefs, song, strategy)]
     ]
     ranked = sorted(
         scored,
